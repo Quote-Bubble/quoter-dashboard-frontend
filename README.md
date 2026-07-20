@@ -1,53 +1,63 @@
 # quoter-dashboard-frontend
 
-Roofer-facing **lead dashboard** for [Quoter](https://github.com/Quote-Bubble).
+Roofer lead dashboard for Quoter. **Next.js scaffold only** — the product UI is not built yet.
 
-Separate from the marketing site, embed widget, and API. Deploy as its **own Vercel project** when the UI is ready.
+Related repos: `quoter-landing`, `quoter-widget-frontend`, `quoter-api-backend`.  
+Database: Supabase project `https://xluasplhfbuxgridtsmd.supabase.co`.
 
-| Repo | Role |
-|------|------|
-| `quoter-landing` | Marketing site (Astro) |
-| `quoter-widget-frontend` | Embeddable quote widget |
-| `quoter-api-backend` | Geocoding / Solar proxy + `POST /api/lead` (live on Vercel) |
-| **`quoter-dashboard-frontend`** | Auth-gated lead inbox (this repo) |
+---
+
+## Already done (don’t redo)
+
+### Rafil
+- Created the Supabase project and ran the SQL migration (`supabase/migrations/0001_init.sql`)
+- Put dashboard **anon** key in local `.env.local` (not in git)
+- Put `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` on Vercel for **`quoter-api-backend`**
+- Owns GitHub org + Vercel; friend does **not** need a paid Vercel team seat
+
+### This session (infra)
+- Created this private repo (Next.js 16 + Tailwind scaffold)
+- Wrote the Supabase schema/RLS migration + demo roofer `quoter-landing-demo`
+- Wired **`quoter-api-backend`** so `POST /api/lead` **saves leads to Supabase** (then optional webhook), with tests — shipped on that repo’s `main`
+
+Flow today:
 
 ```
-Widget → POST /api/lead → quoter-api-backend → Supabase
-                                              ↗
-                         Dashboard (Auth + RLS)
+Widget → POST /api/lead → API → Supabase `leads`
+                              ↗
+                    Dashboard (to build) reads via Auth + RLS
 ```
 
-## Stack
+---
 
-Next.js 16 (App Router) + React 19 + Tailwind 4 + TypeScript + Supabase.
+## What you (friend / friend AI) need to build
 
-## Status
+Everything in **this** repo that makes it a real product:
 
-Infra prep is largely done (Supabase project, schema, API keys on Vercel). See [SETUP.md](./SETUP.md).
+1. Auth (Supabase Auth — invite/login)
+2. Lead inbox (list + detail from `leads`)
+3. Status updates (`new` / `contacted` / `won` / `lost`)
+4. UI/UX — deploy later as its **own** Vercel project (Rafil can import the repo when ready)
 
-**Still open:** dashboard UI (this repo), and API code to insert leads ([BACKEND.md](./BACKEND.md)).
-
-**Giving someone access (no paid Vercel team):** [HANDOFF.md](./HANDOFF.md).
-
-## What to build here
-
-Login, lead list/detail, status updates, filters, design. Tenant isolation is enforced by **RLS** in Supabase — don’t rely only on app-side filters.
-
-Lead fields live on `leads` (plus full JSON in `leads.payload`: `rooferId`, contact, address, `jobType`, `quoteRange`, etc.).
-
-## Local setup
+**Env for local work** (ask Rafil for the anon key; never use the service role here):
 
 ```bash
 npm install
 cp .env.example .env.local
-# NEXT_PUBLIC_SUPABASE_URL + NEXT_PUBLIC_SUPABASE_ANON_KEY
+# NEXT_PUBLIC_SUPABASE_URL=https://xluasplhfbuxgridtsmd.supabase.co
+# NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key from Rafil or Supabase>
 npm run dev
 ```
 
-## Env
+**Schema reference:** `supabase/migrations/0001_init.sql`  
+RLS: logged-in users only see leads for roofers in `roofer_members`. After you have a Supabase Auth user, Rafil (or you, if invited to Supabase) links you:
 
-| Variable | Where |
-|----------|--------|
-| `NEXT_PUBLIC_SUPABASE_URL` | This app |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | This app |
-| `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | **API on Vercel only** — never in this app |
+```sql
+insert into public.roofer_members (roofer_id, user_id)
+select r.id, '<your-auth-user-uuid>'::uuid
+from public.roofers r
+where r.slug = 'quoter-landing-demo'
+on conflict do nothing;
+```
+
+**Out of scope for you unless asked:** changing `quoter-api-backend` lead persistence (already done), Vercel team invites, service role key.
