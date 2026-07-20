@@ -1,65 +1,20 @@
-# Supabase setup (do this before building the dashboard UI)
+# Setup status & handoff
 
-The API currently accepts leads and optionally forwards them to a webhook — it does **not** persist them yet. The dashboard needs a database. Use **Supabase** (Postgres + Auth + RLS).
+Infra prep for the dashboard. Most of this is **already done**.
 
-## 1. Create a Supabase project
+## Done
 
-1. Go to [https://supabase.com](https://supabase.com) → New project  
-2. Pick an org, name it something like `quoter`, choose a region close to your users  
-3. Save the database password somewhere safe  
+- [x] Supabase project created (`https://xluasplhfbuxgridtsmd.supabase.co`)
+- [x] Schema / RLS migration applied (`supabase/migrations/0001_init.sql`)
+- [x] Demo roofer seeded (`quoter-landing-demo`)
+- [x] Dashboard anon key wired locally (`.env.local` on the machine that set it up)
+- [x] API env vars on Vercel (`quoter-api-backend`): `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
 
-## 2. Run the migration
+## Still needed
 
-1. In the Supabase dashboard → **SQL Editor** → New query  
-2. Paste the full contents of [`supabase/migrations/0001_init.sql`](./supabase/migrations/0001_init.sql)  
-3. Run it  
-
-This creates:
-
-- `roofers` — tenant rows (`slug` = widget/API `rooferId`)  
-- `roofer_members` — links Supabase `auth.users` → roofers  
-- `leads` — inbox rows + full JSON `payload`  
-- RLS so a logged-in user only sees their roofer’s data  
-- A demo roofer: slug `quoter-landing-demo`  
-
-## 3. Auth settings (invite-only for now)
-
-1. **Authentication → Providers** → enable **Email**  
-2. Prefer invite / magic-link for early users; turn off open public signup if your project settings allow it  
-3. You can invite your friend from **Authentication → Users → Invite**  
-
-## 4. Keys
-
-**Project Settings → API**
-
-| Key | Goes in |
-|-----|---------|
-| Project URL | Dashboard `.env.local` as `NEXT_PUBLIC_SUPABASE_URL` **and** API as `SUPABASE_URL` |
-| `anon` `public` | Dashboard only: `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
-| `service_role` `secret` | **`quoter-api-backend` only** as `SUPABASE_SERVICE_ROLE_KEY` |
-
-Never put the service role key in this Next.js app or any `NEXT_PUBLIC_*` variable.
-
-Dashboard local:
-
-```bash
-cp .env.example .env.local
-# edit values
-```
-
-API (Vercel project `quoter-api-backend` → Environment Variables):
-
-```
-SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=eyJ...
-```
-
-## 5. Link a user to the demo roofer
-
-After your friend accepts the invite and has a user id:
-
-1. **Authentication → Users** → copy their UUID  
-2. SQL Editor:
+1. **Invite your teammate on GitHub** (see [HANDOFF.md](./HANDOFF.md)) — **not** Vercel (avoids paid team seats). You keep deploys.  
+2. ~~**Wire API lead inserts**~~ — done in `quoter-api-backend` (redeploy API on Vercel if that deploy isn’t live yet). See [BACKEND.md](./BACKEND.md).  
+3. **Link their login to the demo roofer** (after they have a Supabase Auth user):
 
 ```sql
 insert into public.roofer_members (roofer_id, user_id)
@@ -69,26 +24,25 @@ where r.slug = 'quoter-landing-demo'
 on conflict do nothing;
 ```
 
-They can then `select` that roofer’s leads while authenticated. Without this row, RLS returns nothing.
+4. **Redeploy** `quoter-api-backend` on Vercel if you haven’t since adding the env vars (so production picks them up)
 
-## 6. Wire the API (required for real data)
+## For a new machine / teammate local dashboard
 
-Until `quoter-api-backend` inserts into `leads`, the inbox stays empty. Follow **[BACKEND.md](./BACKEND.md)** — write the lead first, then keep the existing webhook behavior.
+```bash
+git clone https://github.com/Quote-Bubble/quoter-dashboard-frontend.git
+cd quoter-dashboard-frontend
+npm install
+cp .env.example .env.local
+# set NEXT_PUBLIC_SUPABASE_URL + NEXT_PUBLIC_SUPABASE_ANON_KEY (ask Rafil for the anon key)
+npm run dev
+```
 
-## 7. Smoke check
-
-1. Confirm demo roofer exists: `select * from roofers where slug = 'quoter-landing-demo';`  
-2. After API is wired, submit a quote from the embed with `roofer=quoter-landing-demo`  
-3. `select id, contact_name, status, received_at from leads order by received_at desc limit 5;`  
-4. Log in as the invited user and query via the Supabase client with the anon key + session — you should only see that roofer’s rows  
+Never put `SUPABASE_SERVICE_ROLE_KEY` in this app.
 
 ## Adding another roofer later
 
 ```sql
 insert into public.roofers (slug, name)
 values ('acme-roofing', 'Acme Roofing');
-
--- then invite their users and insert into roofer_members as above
+-- then add roofer_members rows for that company’s users
 ```
-
-Widget embeds should pass the same slug as `rooferId` / `?roofer=...`.

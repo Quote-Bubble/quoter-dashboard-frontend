@@ -2,53 +2,52 @@
 
 Roofer-facing **lead dashboard** for [Quoter](https://github.com/Quote-Bubble).
 
-This is a separate app from the marketing site, embed widget, and API — it is the only piece with authenticated access to customer lead data (names, phones, addresses). Deploy it as its **own Vercel project** so landing/widget deploys never touch logged-in data.
+Separate from the marketing site, embed widget, and API. Deploy as its **own Vercel project** when the UI is ready.
 
 | Repo | Role |
 |------|------|
 | `quoter-landing` | Marketing site (Astro) |
 | `quoter-widget-frontend` | Embeddable quote widget |
-| `quoter-api-backend` | Geocoding / Solar proxy + `POST /api/lead` |
+| `quoter-api-backend` | Geocoding / Solar proxy + `POST /api/lead` (live on Vercel) |
 | **`quoter-dashboard-frontend`** | Auth-gated lead inbox (this repo) |
 
 ```
-Widget → POST /api/lead → quoter-api-backend → Supabase (leads)
+Widget → POST /api/lead → quoter-api-backend → Supabase
                                               ↗
                          Dashboard (Auth + RLS)
 ```
 
 ## Stack
 
-- Next.js 16 (App Router) + React 19 + Tailwind 4 + TypeScript
-- Supabase (Postgres + Auth + Row Level Security) — see [SETUP.md](./SETUP.md)
+Next.js 16 (App Router) + React 19 + Tailwind 4 + TypeScript + Supabase.
 
-## What is (and isn’t) in this repo yet
+## Status
 
-**In:** Next.js scaffold, Supabase SQL migration, env example, setup docs.
+Infra prep is largely done (Supabase project, schema, API keys on Vercel). See [SETUP.md](./SETUP.md).
 
-**Not in (your job if you’re building the product UI):** login, lead list/detail, status updates, filters, design. Tenant isolation must still rely on **RLS** in the database — app filters are not enough.
+**Still open:** dashboard UI (this repo), and API code to insert leads ([BACKEND.md](./BACKEND.md)).
 
-Lead payload shape (from the API) includes `rooferId`, `contact` (name/phone/email), `address`, `jobType`, `quoteRange`, `solar`, etc. Full JSON is stored on `leads.payload`.
+**Giving someone access (no paid Vercel team):** [HANDOFF.md](./HANDOFF.md).
+
+## What to build here
+
+Login, lead list/detail, status updates, filters, design. Tenant isolation is enforced by **RLS** in Supabase — don’t rely only on app-side filters.
+
+Lead fields live on `leads` (plus full JSON in `leads.payload`: `rooferId`, contact, address, `jobType`, `quoteRange`, etc.).
 
 ## Local setup
 
 ```bash
 npm install
 cp .env.example .env.local
-# fill NEXT_PUBLIC_SUPABASE_URL + NEXT_PUBLIC_SUPABASE_ANON_KEY after SETUP.md
+# NEXT_PUBLIC_SUPABASE_URL + NEXT_PUBLIC_SUPABASE_ANON_KEY
 npm run dev
 ```
 
-## Docs
-
-1. **[SETUP.md](./SETUP.md)** — create Supabase project, run migration, invite users, wire keys  
-2. **[BACKEND.md](./BACKEND.md)** — how `quoter-api-backend` must insert leads (required or the inbox stays empty)
-
 ## Env
 
-| Variable | Where | Notes |
-|----------|--------|--------|
-| `NEXT_PUBLIC_SUPABASE_URL` | This app | Project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | This app | Anon/public key only |
-| `SUPABASE_URL` | **API only** | Same project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | **API only** | Never ship to the browser |
+| Variable | Where |
+|----------|--------|
+| `NEXT_PUBLIC_SUPABASE_URL` | This app |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | This app |
+| `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | **API on Vercel only** — never in this app |

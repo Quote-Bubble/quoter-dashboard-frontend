@@ -1,8 +1,8 @@
 # Backend insert contract (`quoter-api-backend`)
 
-Without this change, Supabase stays empty and the dashboard has nothing to show.
+**Implemented** in `quoter-api-backend` (`lib/leads.ts` + `POST /api/lead`): validate → persist to Supabase (when env is set) → optional webhook → `202`.
 
-Today [`POST /api/lead`](https://github.com/Quote-Bubble/quoter-api-backend) validates the payload, optionally POSTs to `LEAD_WEBHOOK_URL`, and returns `{ ok, leadId }`. It does not store the lead.
+This doc remains the contract reference for the dashboard / future API work.
 
 ## Required behavior
 
