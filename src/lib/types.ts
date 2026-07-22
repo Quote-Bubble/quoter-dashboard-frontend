@@ -2,10 +2,9 @@
  * Dashboard-facing types.
  *
  * The persisted lead fields mirror the `leads` table (see
- * quoter-backend/lib/leads.ts). `accessScore` and `distanceMiles` are NOT
- * persisted today (access is computed in the widget and never stored;
- * distance-from-home isn't computed anywhere) — they exist here as mock-only
- * fields so the UI can show them. Wiring them for real is future backend work.
+ * quoter-backend/lib/leads.ts). Only fields that actually exist on a row are
+ * modelled here — if the database doesn't store it, the dashboard doesn't
+ * show it.
  */
 
 export type LeadStatus = "new" | "contacted" | "won" | "lost";
@@ -17,9 +16,6 @@ export type JobType =
   | "leak_investigation"
   | "gutters_fascias_soffits"
   | "other";
-
-/** Qualitative access rating derived from pitch, planes, storeys, property type. */
-export type AccessScore = "easy" | "moderate" | "difficult";
 
 export type DashboardLead = {
   id: string;
@@ -33,17 +29,70 @@ export type DashboardLead = {
   addressPostcode: string;
   quoteMinExVat: number | null;
   quoteMaxExVat: number | null;
-  /** Mock-only — not persisted yet. */
-  accessScore: AccessScore;
-  /** Distance from the roofer's base, miles. Not persisted yet — null for
-   *  real leads until the widget/backend compute and store it. */
-  distanceMiles: number | null;
   receivedAt: string; // ISO timestamp
   /** Hidden from the main tabs; shown under "Archived". */
   archived?: boolean;
 };
 
-/** Per-roofer pricing profile edited on the Account page (mock, not persisted). */
+// ---------------------------------------------------------------------------
+// leads.payload (jsonb)
+//
+// Mirrors LeadPayload in quoter-backend/lib/types.ts, which is the source of
+// truth — the backend stores the widget's payload verbatim. Everything is
+// optional on read: rows written by older widget versions may be missing keys,
+// so treat this as untrusted shape and render "—" rather than inventing values.
+// ---------------------------------------------------------------------------
+
+export type LatLng = { lat: number; lng: number };
+
+export type RoofType = "gable" | "hip" | "flat";
+
+export type ConditionAnswer = "yes" | "no" | "not_sure";
+
+export type RooflineScope = "gutters_only" | "gutters_fascias";
+
+export type LeadPayload = {
+  otherJobDescription?: string | null;
+  coords?: LatLng | null;
+  solar?: {
+    areaM2?: number | null;
+    groundAreaM2?: number | null;
+    pitchDegrees?: number | null;
+    roofType?: RoofType | null;
+    measurementMethod?: string | null;
+    imageryQuality?: string | null;
+    imageryDate?: string | null;
+  } | null;
+  /** Outline of ONE roof face — the widget keeps only the largest and discards
+   *  the rest (quoter-widget-frontend/lib/quote-flow.ts:532). When the customer
+   *  never drew, it falls back to a rectangle from the scan bounding box. */
+  polygonCoords?: LatLng[] | null;
+  conditionAnswer?: ConditionAnswer | null;
+  conditionFlagged?: boolean;
+  material?: string | null;
+  /** Totals only — which edges the customer marked as gutters is not stored. */
+  roofline?: {
+    perimeterM?: number | null;
+    gutterLengthM?: number | null;
+    scope?: RooflineScope | null;
+  } | null;
+  /** Counts only — the positions the customer placed are not stored. */
+  obstructions?: {
+    chimneys?: number | null;
+    rooflights?: number | null;
+  } | null;
+  fallbackReason?: string | null;
+};
+
+/** Fetch state for one lead's payload, loaded lazily when a row is expanded. */
+export type LeadPayloadState = {
+  data: LeadPayload | null;
+  loading: boolean;
+  error: string | null;
+};
+
+/** Per-roofer pricing profile edited on the Account page. Persisted in
+ *  `roofer_pricing` (see supabase/migrations/0002_roofer_pricing.sql). */
 export type PricingProfile = {
   materials: { key: string; label: string; unit: string; rate: number }[];
   labourPerDay: number;
@@ -53,10 +102,9 @@ export type PricingProfile = {
   vatRegistered: boolean;
 };
 
+/** A row from `roofers`, scoped by RLS to companies the user belongs to. */
 export type RooferProfile = {
-  name: string;
+  id: string;
   slug: string;
-  base: string;
-  plan: string;
-  contactEmail: string;
+  name: string;
 };

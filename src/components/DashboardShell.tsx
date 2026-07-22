@@ -2,15 +2,18 @@
 
 import { useState } from "react";
 
+import type { RooferProfile } from "@/lib/types";
 import Sidebar from "@/components/Sidebar";
 import CloudsBackground from "@/components/CloudsBackground";
 
 export default function DashboardShell({
   children,
   userEmail,
+  roofer,
 }: {
   children: React.ReactNode;
   userEmail?: string | null;
+  roofer: RooferProfile | null;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -51,7 +54,11 @@ export default function DashboardShell({
             onClick={() => setMobileOpen(false)}
           />
           <div className="surface absolute inset-y-0 left-0 w-72 max-w-[80%]">
-            <Sidebar userEmail={userEmail} onNavigate={() => setMobileOpen(false)} />
+            <Sidebar
+              userEmail={userEmail}
+              roofer={roofer}
+              onNavigate={() => setMobileOpen(false)}
+            />
           </div>
         </div>
       )}
@@ -59,7 +66,7 @@ export default function DashboardShell({
       <div className="flex">
         {/* Desktop sidebar */}
         <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 border-r border-white/50 bg-[#fafafb]/45 [backdrop-filter:blur(44px)_saturate(1.6)] md:block">
-          <Sidebar userEmail={userEmail} />
+          <Sidebar userEmail={userEmail} roofer={roofer} />
         </aside>
 
         {/* Main content */}

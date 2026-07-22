@@ -1,15 +1,24 @@
 "use client";
 
-import type { DashboardLead } from "@/lib/types";
+import type { DashboardLead, LeadPayload } from "@/lib/types";
 import {
-  accessLabel,
+  EMPTY,
+  conditionLabel,
+  formatArea,
+  formatCount,
+  formatDateOnly,
   formatDateTime,
-  formatDistance,
+  formatLength,
+  formatPitch,
   formatQuoteRange,
   jobTypeLabel,
+  materialLabel,
+  payloadLabel,
+  rooflineScopeLabel,
+  roofTypeLabel,
   whatsappLink,
 } from "@/lib/format";
-import SatelliteView from "@/components/SatelliteView";
+import RoofPlan from "@/components/RoofPlan";
 
 const iconProps = {
   width: 16,
@@ -51,16 +60,14 @@ const Icons = {
       <path d="M3 10h18M8 3v4M16 3v4" />
     </svg>
   ),
-  route: (
+  layers: (
     <svg {...iconProps}>
-      <circle cx="6" cy="18" r="2.5" />
-      <circle cx="18" cy="6" r="2.5" />
-      <path d="M8.5 17.5 15.5 8" />
+      <path d="M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5" />
     </svg>
   ),
-  chart: (
+  alert: (
     <svg {...iconProps}>
-      <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+      <path d="M12 4l9 16H3l9-16zM12 10v4M12 17h.01" />
     </svg>
   ),
 };
@@ -94,11 +101,45 @@ function MetaRow({
   );
 }
 
-export default function QuoteDetailPanel({ lead }: { lead: DashboardLead }) {
+/** Compact label-over-value cell for the survey grid. */
+function Figure({ label, value }: { label: string; value: string }) {
+  const missing = value === EMPTY;
+  return (
+    <div>
+      <p className="text-[11px] font-medium uppercase tracking-wide text-muted">
+        {label}
+      </p>
+      <p
+        className={[
+          "mt-0.5 text-sm font-semibold",
+          missing ? "text-muted" : "text-ink",
+        ].join(" ")}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+export default function QuoteDetailPanel({
+  lead,
+  payload,
+  loading,
+  error,
+}: {
+  lead: DashboardLead;
+  payload: LeadPayload | null;
+  loading: boolean;
+  error: string | null;
+}) {
+  const solar = payload?.solar ?? null;
+  const roofline = payload?.roofline ?? null;
+  const obstructions = payload?.obstructions ?? null;
+
   return (
     <div className="px-4 pb-4 pt-1 sm:px-6">
       <div className="surface overflow-hidden rounded-2xl p-6 sm:p-7">
-        {/* Top: estimate + satellite */}
+        {/* Top: estimate + roof plan */}
         <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-600">
@@ -115,17 +156,34 @@ export default function QuoteDetailPanel({ lead }: { lead: DashboardLead }) {
               {lead.leadType === "manual_consultation" &&
                 " · consultation request"}
             </p>
+            {payload?.otherJobDescription && (
+              <p className="mt-3 rounded-lg bg-black/[0.03] px-3 py-2 text-sm text-ink-soft">
+                “{payload.otherJobDescription}”
+              </p>
+            )}
+            {payload?.fallbackReason && (
+              <p className="mt-3 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                <span className="mt-0.5 shrink-0">{Icons.alert}</span>
+                <span>
+                  No instant quote — {payloadLabel(payload.fallbackReason)}
+                </span>
+              </p>
+            )}
           </div>
 
           <div className="h-56 lg:h-full">
-            <SatelliteView address={lead.addressFormatted} />
+            {loading ? (
+              <div className="h-full min-h-[220px] animate-pulse rounded-xl bg-black/[0.04]" />
+            ) : (
+              <RoofPlan payload={payload} />
+            )}
           </div>
         </div>
 
         {/* Divider */}
         <div className="my-6 border-t border-line" />
 
-        {/* Bottom: three columns */}
+        {/* Contact · Property · Lead details */}
         <div className="grid gap-6 divide-line sm:grid-cols-3 sm:gap-0 sm:divide-x">
           {/* Contact */}
           <div className="sm:pr-8">
@@ -167,13 +225,13 @@ export default function QuoteDetailPanel({ lead }: { lead: DashboardLead }) {
             <div className="flex items-start gap-2.5 py-1">
               <span className="mt-0.5 text-muted">{Icons.pin}</span>
               <span className="text-sm font-semibold text-ink">
-                {lead.addressFormatted}
+                {lead.addressFormatted || EMPTY}
               </span>
             </div>
             <div className="flex items-center gap-2.5 py-2">
               <span className="text-muted">{Icons.postcode}</span>
               <span className="text-sm font-medium text-ink-soft">
-                {lead.addressPostcode}
+                {lead.addressPostcode || EMPTY}
               </span>
             </div>
           </div>
@@ -188,17 +246,78 @@ export default function QuoteDetailPanel({ lead }: { lead: DashboardLead }) {
                 value={formatDateTime(lead.receivedAt)}
               />
               <MetaRow
-                icon={Icons.route}
-                label="Distance"
-                value={formatDistance(lead.distanceMiles)}
+                icon={Icons.layers}
+                label="Material"
+                value={materialLabel(payload?.material)}
               />
               <MetaRow
-                icon={Icons.chart}
-                label="Access rating"
-                value={accessLabel(lead.accessScore)}
+                icon={Icons.alert}
+                label="Condition"
+                value={conditionLabel(payload?.conditionAnswer)}
               />
             </div>
           </div>
+        </div>
+
+        {/* Survey figures straight off the payload */}
+        <div className="mt-6 border-t border-line pt-5">
+          <ColLabel>Survey</ColLabel>
+
+          {error ? (
+            <p className="text-sm text-red-700">
+              Couldn’t load the full detail for this lead: {error}
+            </p>
+          ) : loading ? (
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="space-y-1.5">
+                  <div className="h-2.5 w-16 animate-pulse rounded bg-black/[0.06]" />
+                  <div className="h-3.5 w-12 animate-pulse rounded bg-black/[0.06]" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
+                <Figure label="Roof area" value={formatArea(solar?.areaM2)} />
+                <Figure
+                  label="Ground area"
+                  value={formatArea(solar?.groundAreaM2)}
+                />
+                <Figure label="Pitch" value={formatPitch(solar?.pitchDegrees)} />
+                <Figure
+                  label="Roof type"
+                  value={roofTypeLabel(solar?.roofType)}
+                />
+                <Figure
+                  label="Gutter run"
+                  value={formatLength(roofline?.gutterLengthM)}
+                />
+                <Figure
+                  label="Roofline scope"
+                  value={rooflineScopeLabel(roofline?.scope)}
+                />
+                <Figure
+                  label="Chimneys"
+                  value={formatCount(obstructions?.chimneys)}
+                />
+                <Figure
+                  label="Rooflights"
+                  value={formatCount(obstructions?.rooflights)}
+                />
+              </div>
+
+              <p className="mt-4 text-xs text-muted">
+                Measured by {payloadLabel(solar?.measurementMethod)} · imagery{" "}
+                {payloadLabel(solar?.imageryQuality).toLowerCase()}
+                {solar?.imageryDate
+                  ? `, captured ${formatDateOnly(solar.imageryDate)}`
+                  : ""}
+                . Gutter and obstruction figures are totals — the widget does not
+                store where the customer marked them.
+              </p>
+            </>
+          )}
         </div>
       </div>
     </div>

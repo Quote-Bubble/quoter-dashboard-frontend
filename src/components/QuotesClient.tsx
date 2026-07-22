@@ -2,7 +2,12 @@
 
 import { useMemo, useRef, useState } from "react";
 
-import type { DashboardLead, LeadStatus } from "@/lib/types";
+import type {
+  DashboardLead,
+  LeadPayload,
+  LeadPayloadState,
+  LeadStatus,
+} from "@/lib/types";
 import { jobTypeLabel, statusLabel, STATUS_ORDER } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
 import PageHeader from "@/components/PageHeader";
@@ -32,8 +37,6 @@ function compare(a: DashboardLead, b: DashboardLead, key: SortKey): number {
       return jobTypeLabel(a.jobType).localeCompare(jobTypeLabel(b.jobType));
     case "quote":
       return (a.quoteMaxExVat ?? 0) - (b.quoteMaxExVat ?? 0);
-    case "distanceMiles":
-      return (a.distanceMiles ?? Infinity) - (b.distanceMiles ?? Infinity);
     case "status":
       return STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
     case "receivedAt":
@@ -45,8 +48,10 @@ function compare(a: DashboardLead, b: DashboardLead, key: SortKey): number {
 
 export default function QuotesClient({
   initialLeads,
+  rooferSlug,
 }: {
   initialLeads: DashboardLead[];
+  rooferSlug: string;
 }) {
   const [leads, setLeads] = useState<DashboardLead[]>(initialLeads);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -56,6 +61,11 @@ export default function QuotesClient({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [flashWonId, setFlashWonId] = useState<string | null>(null);
   const flashTimer = useRef<number | null>(null);
+
+  // `payload` is a fat jsonb column (roof segments, per-segment contributions),
+  // so it's fetched per lead on expand rather than in the list query.
+  const [payloads, setPayloads] = useState<Record<string, LeadPayloadState>>({});
+  const requested = useRef<Set<string>>(new Set());
 
   const counts = useMemo(() => {
     const c: Record<StatusFilter, number> = {
@@ -135,8 +145,42 @@ export default function QuotesClient({
     setExpandedId((cur) => (cur === id ? null : cur));
   };
 
+  const loadPayload = (id: string) => {
+    if (requested.current.has(id)) return;
+    requested.current.add(id);
+    setPayloads((p) => ({
+      ...p,
+      [id]: { data: null, loading: true, error: null },
+    }));
+
+    void createClient()
+      .from("leads")
+      .select("payload")
+      .eq("id", id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) {
+          requested.current.delete(id); // let a re-expand retry
+          setPayloads((p) => ({
+            ...p,
+            [id]: { data: null, loading: false, error: error.message },
+          }));
+          return;
+        }
+        setPayloads((p) => ({
+          ...p,
+          [id]: {
+            data: (data?.payload ?? null) as LeadPayload | null,
+            loading: false,
+            error: null,
+          },
+        }));
+      });
+  };
+
   const handleToggle = (id: string) => {
     setExpandedId((cur) => (cur === id ? null : id));
+    loadPayload(id);
   };
 
   const order: StatusFilter[] = ["all", ...STATUS_ORDER, "archived"];
@@ -191,9 +235,12 @@ export default function QuotesClient({
         onSort={handleSort}
         onToggle={handleToggle}
         expandedId={expandedId}
+        payloads={payloads}
         onStatusChange={handleStatusChange}
         onArchive={handleArchive}
         archivedView={statusFilter === "archived"}
+        noLeadsAtAll={leads.length === 0}
+        rooferSlug={rooferSlug}
         flashWonId={flashWonId}
         newId={null}
       />

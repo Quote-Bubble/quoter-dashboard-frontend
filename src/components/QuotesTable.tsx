@@ -3,9 +3,13 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 
-import type { DashboardLead, LeadStatus } from "@/lib/types";
+import type {
+  DashboardLead,
+  LeadPayloadState,
+  LeadStatus,
+} from "@/lib/types";
 import { EXPAND_TRANSITION, rowExit } from "@/lib/motion";
-import { formatDistance, formatRelativeTime, jobTypeLabel } from "@/lib/format";
+import { formatRelativeTime, jobTypeLabel } from "@/lib/format";
 import StatusPicker from "@/components/StatusPicker";
 import QuoteDetailPanel from "@/components/QuoteDetailPanel";
 import MoneyRange from "@/components/MoneyRange";
@@ -15,7 +19,6 @@ export type SortKey =
   | "jobType"
   | "quote"
   | "status"
-  | "distanceMiles"
   | "receivedAt";
 
 export type SortDir = "asc" | "desc";
@@ -23,7 +26,7 @@ export type SortDir = "asc" | "desc";
 /** One shared column template keeps header + every row aligned and static.
  *  All columns left-aligned with generous spacing. */
 const GRID_TEMPLATE =
-  "minmax(210px,1.5fr) minmax(180px,1.3fr) 160px 130px 110px 120px 44px";
+  "minmax(220px,1.6fr) minmax(190px,1.4fr) 170px 140px 130px 44px";
 
 const gridStyle = { gridTemplateColumns: GRID_TEMPLATE } as const;
 
@@ -34,7 +37,6 @@ const HEADER_COLS: { key: SortKey; label: string }[] = [
   { key: "jobType", label: "Job type" },
   { key: "quote", label: "Estimate" },
   { key: "status", label: "Status" },
-  { key: "distanceMiles", label: "Distance" },
   { key: "receivedAt", label: "Received" },
 ];
 
@@ -82,9 +84,12 @@ export default function QuotesTable({
   onSort,
   onToggle,
   expandedId,
+  payloads,
   onStatusChange,
   onArchive,
   archivedView,
+  noLeadsAtAll,
+  rooferSlug,
   flashWonId,
   newId,
 }: {
@@ -94,9 +99,13 @@ export default function QuotesTable({
   onSort: (key: SortKey) => void;
   onToggle: (id: string) => void;
   expandedId: string | null;
+  payloads: Record<string, LeadPayloadState>;
   onStatusChange: (id: string, status: LeadStatus) => void;
   onArchive: (id: string) => void;
   archivedView: boolean;
+  /** No leads exist at all, as opposed to none matching the current filter. */
+  noLeadsAtAll: boolean;
+  rooferSlug: string;
   flashWonId: string | null;
   newId: string | null;
 }) {
@@ -115,7 +124,7 @@ export default function QuotesTable({
   return (
     <div className="surface overflow-hidden rounded-2xl shadow-[0_12px_40px_-24px_rgba(10,11,13,0.35)]">
       <div className="overflow-x-auto">
-        <div className="min-w-[960px]">
+        <div className="min-w-[880px]">
           {/* Header */}
           <div
             className="grid items-center gap-x-4 border-b border-line px-6 py-3.5 text-sm"
@@ -226,11 +235,6 @@ export default function QuotesTable({
                           />
                         </div>
 
-                        {/* Distance */}
-                        <div className="tabular-nums text-ink-soft">
-                          {formatDistance(lead.distanceMiles)}
-                        </div>
-
                         {/* Received */}
                         <div className="text-muted" suppressHydrationWarning>
                           {formatRelativeTime(lead.receivedAt)}
@@ -266,7 +270,12 @@ export default function QuotesTable({
                             style={{ overflow: "hidden" }}
                             className="bg-black/[0.015]"
                           >
-                            <QuoteDetailPanel lead={lead} />
+                            <QuoteDetailPanel
+                              lead={lead}
+                              payload={payloads[lead.id]?.data ?? null}
+                              loading={payloads[lead.id]?.loading ?? true}
+                              error={payloads[lead.id]?.error ?? null}
+                            />
                           </motion.div>
                         )}
                       </AnimatePresence>
@@ -285,12 +294,26 @@ export default function QuotesTable({
             🏠
           </div>
           <p className="text-sm font-semibold text-ink">
-            {archivedView ? "Nothing archived" : "No quotes match"}
-          </p>
-          <p className="mt-1 max-w-xs text-sm text-muted">
             {archivedView
-              ? "Quotes you archive will appear here."
-              : "New enquiries from your website appear here instantly."}
+              ? "Nothing archived"
+              : noLeadsAtAll
+                ? "No leads yet"
+                : "No quotes match"}
+          </p>
+          <p className="mt-1 max-w-sm text-sm text-muted">
+            {archivedView ? (
+              "Quotes you archive will appear here."
+            ) : noLeadsAtAll ? (
+              <>
+                Nobody has submitted a quote through your widget yet. It posts to{" "}
+                <code className="rounded bg-black/[0.05] px-1 py-0.5 font-mono text-xs">
+                  {rooferSlug}
+                </code>
+                .
+              </>
+            ) : (
+              "Try a different status or clear the search."
+            )}
           </p>
         </div>
       )}

@@ -1,4 +1,9 @@
-import type { AccessScore, JobType, LeadStatus } from "@/lib/types";
+import type {
+  ConditionAnswer,
+  JobType,
+  LeadStatus,
+  RooflineScope,
+} from "@/lib/types";
 
 const gbp = new Intl.NumberFormat("en-GB", {
   style: "currency",
@@ -88,30 +93,106 @@ export function statusColor(status: LeadStatus): { fg: string; bg: string } {
   }
 }
 
-const ACCESS_LABELS: Record<AccessScore, string> = {
-  easy: "Easy",
-  moderate: "Moderate",
-  difficult: "Difficult",
+// ---------------------------------------------------------------------------
+// leads.payload formatting
+//
+// Everything below renders "—" for null/undefined rather than substituting a
+// plausible default. If the widget didn't capture it, the roofer sees a dash.
+// ---------------------------------------------------------------------------
+
+export const EMPTY = "—";
+
+/** snake_case → "Snake case", for payload enums we have no explicit label for. */
+function humanise(value: string): string {
+  const spaced = value.replace(/_/g, " ").trim();
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+const MATERIAL_LABELS: Record<string, string> = {
+  concrete_tile: "Concrete tile",
+  clay_tile: "Clay tile",
+  natural_slate: "Natural slate",
+  fibre_cement: "Fibre cement",
+  flat_bitumen: "Bitumen (flat)",
+  flat_epdm: "EPDM rubber (flat)",
+  flat_grp: "GRP fibreglass (flat)",
+  polycarbonate: "Polycarbonate",
+  glass_plain: "Plain glass",
+  glass_laminated: "Laminated glass",
+  felt: "Built-up felt",
+  not_sure: "Not sure",
 };
 
-export function accessLabel(score: AccessScore): string {
-  return ACCESS_LABELS[score];
+export function materialLabel(material: string | null | undefined): string {
+  if (!material) return EMPTY;
+  return MATERIAL_LABELS[material] ?? humanise(material);
 }
 
-export function accessColor(score: AccessScore): { fg: string; bg: string } {
-  switch (score) {
-    case "easy":
-      return { fg: "#0d6b3c", bg: "#e6f6ee" };
-    case "moderate":
-      return { fg: "#8a5a12", bg: "#fdf3e2" };
-    case "difficult":
-      return { fg: "#b02a2a", bg: "#fbeaea" };
-  }
+const CONDITION_LABELS: Record<ConditionAnswer, string> = {
+  yes: "Reported damage or leaks",
+  no: "No damage reported",
+  not_sure: "Not sure",
+};
+
+export function conditionLabel(
+  answer: ConditionAnswer | null | undefined,
+): string {
+  if (!answer) return EMPTY;
+  return CONDITION_LABELS[answer] ?? humanise(answer);
 }
 
-export function formatDistance(miles: number | null): string {
-  if (miles == null) return "—";
-  return `${miles.toFixed(1)} mi`;
+const ROOFLINE_SCOPE_LABELS: Record<RooflineScope, string> = {
+  gutters_only: "Gutters only",
+  gutters_fascias: "Gutters & fascias",
+};
+
+export function rooflineScopeLabel(
+  scope: RooflineScope | null | undefined,
+): string {
+  if (!scope) return EMPTY;
+  return ROOFLINE_SCOPE_LABELS[scope] ?? humanise(scope);
+}
+
+export function roofTypeLabel(type: string | null | undefined): string {
+  return type ? humanise(type) : EMPTY;
+}
+
+/** Free-text-ish payload enums (measurement method, imagery quality). */
+export function payloadLabel(value: string | null | undefined): string {
+  return value ? humanise(value) : EMPTY;
+}
+
+export function formatArea(m2: number | null | undefined): string {
+  if (m2 == null || !Number.isFinite(m2)) return EMPTY;
+  return `${Math.round(m2)} m²`;
+}
+
+export function formatLength(m: number | null | undefined): string {
+  if (m == null || !Number.isFinite(m)) return EMPTY;
+  return `${m.toFixed(1)} m`;
+}
+
+export function formatPitch(degrees: number | null | undefined): string {
+  if (degrees == null || !Number.isFinite(degrees)) return EMPTY;
+  return `${Math.round(degrees)}°`;
+}
+
+export function formatCount(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return EMPTY;
+  return String(n);
+}
+
+/** Date-only, for imagery capture dates which carry no meaningful time. */
+export function formatDateOnly(iso: string | null | undefined): string {
+  if (!iso) return EMPTY;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return EMPTY;
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "Europe/London",
+  });
 }
 
 /** Build a wa.me link from a UK phone number (07… → +447…). */

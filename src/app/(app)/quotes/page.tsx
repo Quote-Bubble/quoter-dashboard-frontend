@@ -1,6 +1,9 @@
 import type { DashboardLead, JobType, LeadStatus } from "@/lib/types";
 import { createClient } from "@/lib/supabase/server";
+import { getRoofer } from "@/lib/roofer";
 import QuotesClient from "@/components/QuotesClient";
+import PageHeader from "@/components/PageHeader";
+import NotLinkedNotice from "@/components/NotLinkedNotice";
 
 type LeadRow = {
   id: string;
@@ -17,8 +20,7 @@ type LeadRow = {
   received_at: string;
 };
 
-/** Map a persisted lead row to the dashboard view model.
- *  accessScore/distance aren't stored yet — defaulted (see types.ts note). */
+/** Map a persisted lead row to the dashboard view model. */
 function mapRow(row: LeadRow): DashboardLead {
   return {
     id: row.id,
@@ -32,8 +34,6 @@ function mapRow(row: LeadRow): DashboardLead {
     addressPostcode: row.address_postcode ?? "",
     quoteMinExVat: row.quote_min_ex_vat,
     quoteMaxExVat: row.quote_max_ex_vat,
-    accessScore: "moderate",
-    distanceMiles: null,
     receivedAt: row.received_at,
   };
 }
@@ -43,13 +43,43 @@ export const dynamic = "force-dynamic";
 
 export default async function QuotesPage() {
   const supabase = await createClient();
-  const { data } = await supabase
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // No roofer membership means RLS will return zero leads no matter what — say
+  // that plainly instead of rendering an empty table.
+  const roofer = await getRoofer();
+  if (!roofer) {
+    return (
+      <>
+        <PageHeader title="Quotes" />
+        <NotLinkedNotice userId={user?.id ?? "unknown"} />
+      </>
+    );
+  }
+
+  const { data, error } = await supabase
     .from("leads")
     .select(
       "id,status,lead_type,job_type,contact_name,contact_phone,contact_email,address_formatted,address_postcode,quote_min_ex_vat,quote_max_ex_vat,received_at",
     )
     .order("received_at", { ascending: false });
 
+  if (error) {
+    return (
+      <>
+        <PageHeader title="Quotes" />
+        <div className="surface rounded-2xl p-6">
+          <h2 className="font-display text-lg font-semibold text-ink">
+            Couldn’t load your leads
+          </h2>
+          <p className="mt-2 text-sm text-ink-soft">{error.message}</p>
+        </div>
+      </>
+    );
+  }
+
   const leads = ((data as LeadRow[] | null) ?? []).map(mapRow);
-  return <QuotesClient initialLeads={leads} />;
+  return <QuotesClient initialLeads={leads} rooferSlug={roofer.slug} />;
 }

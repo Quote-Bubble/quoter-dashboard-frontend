@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion } from "motion/react";
 
-import { rooferProfile } from "@/lib/mock-data";
+import type { RooferProfile } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 
 type NavItem = {
@@ -61,9 +61,11 @@ const NAV: NavItem[] = [
 export default function Sidebar({
   onNavigate,
   userEmail,
+  roofer,
 }: {
   onNavigate?: () => void;
   userEmail?: string | null;
+  roofer: RooferProfile | null;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -134,15 +136,13 @@ export default function Sidebar({
       <div className="mt-auto">
         <div className="surface flex items-center gap-3 rounded-xl p-3">
           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-gradient-to-b from-brand-400 to-brand-600 text-sm font-semibold text-white">
-            {rooferProfile.name.charAt(0)}
+            {roofer?.name.charAt(0) ?? "?"}
           </div>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-ink">
-              {rooferProfile.name}
+              {roofer?.name ?? "No roofer linked"}
             </p>
-            <p className="truncate text-xs text-muted">
-              {userEmail ?? rooferProfile.plan}
-            </p>
+            <p className="truncate text-xs text-muted">{userEmail ?? ""}</p>
           </div>
         </div>
         <button

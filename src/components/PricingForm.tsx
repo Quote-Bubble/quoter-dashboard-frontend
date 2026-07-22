@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import type { PricingProfile } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
 
 function MoneyInput({
   value,
@@ -47,15 +48,18 @@ function Section({
 }
 
 export default function PricingForm({
+  rooferId,
   initial,
   onSaved,
 }: {
+  rooferId: string;
   initial: PricingProfile;
   onSaved: () => void;
 }) {
   const [profile, setProfile] = useState<PricingProfile>(initial);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const update = (patch: Partial<PricingProfile>) => {
     setProfile((p) => ({ ...p, ...patch }));
@@ -70,14 +74,33 @@ export default function PricingForm({
     });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setSaving(true);
-    // Mock save — no persistence yet.
-    setTimeout(() => {
-      setSaving(false);
-      setDirty(false);
-      onSaved();
-    }, 700);
+    setError(null);
+
+    const { error: saveError } = await createClient()
+      .from("roofer_pricing")
+      .upsert(
+        {
+          roofer_id: rooferId,
+          materials: profile.materials,
+          labour_per_day: profile.labourPerDay,
+          minimum_callout: profile.minimumCallout,
+          skip_hire: profile.skipHire,
+          scaffold_per_week: profile.scaffoldPerWeek,
+          vat_registered: profile.vatRegistered,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "roofer_id" },
+      );
+
+    setSaving(false);
+    if (saveError) {
+      setError(saveError.message);
+      return; // stay dirty so the roofer can retry
+    }
+    setDirty(false);
+    onSaved();
   };
 
   return (
@@ -153,8 +176,12 @@ export default function PricingForm({
 
       {/* Save bar */}
       <div className="sticky bottom-4 flex items-center justify-end gap-3">
-        {dirty && (
-          <span className="text-sm text-muted">Unsaved changes</span>
+        {error ? (
+          <span className="rounded-lg bg-red-50 px-3 py-1.5 text-sm text-red-700">
+            Couldn’t save: {error}
+          </span>
+        ) : (
+          dirty && <span className="text-sm text-muted">Unsaved changes</span>
         )}
         <button
           type="button"
