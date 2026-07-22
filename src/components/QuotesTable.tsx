@@ -1,0 +1,299 @@
+"use client";
+
+import { useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+
+import type { DashboardLead, LeadStatus } from "@/lib/types";
+import { EXPAND_TRANSITION, rowExit } from "@/lib/motion";
+import { formatDistance, formatRelativeTime, jobTypeLabel } from "@/lib/format";
+import StatusPicker from "@/components/StatusPicker";
+import QuoteDetailPanel from "@/components/QuoteDetailPanel";
+import MoneyRange from "@/components/MoneyRange";
+
+export type SortKey =
+  | "contactName"
+  | "jobType"
+  | "quote"
+  | "status"
+  | "distanceMiles"
+  | "receivedAt";
+
+export type SortDir = "asc" | "desc";
+
+/** One shared column template keeps header + every row aligned and static.
+ *  All columns left-aligned with generous spacing. */
+const GRID_TEMPLATE =
+  "minmax(210px,1.5fr) minmax(180px,1.3fr) 160px 130px 110px 120px 44px";
+
+const gridStyle = { gridTemplateColumns: GRID_TEMPLATE } as const;
+
+const SWIPE_MS = 260;
+
+const HEADER_COLS: { key: SortKey; label: string }[] = [
+  { key: "contactName", label: "Contact" },
+  { key: "jobType", label: "Job type" },
+  { key: "quote", label: "Estimate" },
+  { key: "status", label: "Status" },
+  { key: "distanceMiles", label: "Distance" },
+  { key: "receivedAt", label: "Received" },
+];
+
+function SortCaret({ dir }: { dir: SortDir }) {
+  return (
+    <svg
+      width={13}
+      height={13}
+      viewBox="0 0 24 24"
+      className="text-ink-soft"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.4}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      {dir === "asc" ? <path d="M6 15l6-6 6 6" /> : <path d="M6 9l6 6 6-6" />}
+    </svg>
+  );
+}
+
+function ArchiveIcon() {
+  return (
+    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="3" y="4" width="18" height="4" rx="1" />
+      <path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4" />
+    </svg>
+  );
+}
+
+function RestoreIcon() {
+  return (
+    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 8a9 9 0 1 1-1.5 5" />
+      <path d="M3 4v4h4" />
+    </svg>
+  );
+}
+
+export default function QuotesTable({
+  leads,
+  sortKey,
+  sortDir,
+  onSort,
+  onToggle,
+  expandedId,
+  onStatusChange,
+  onArchive,
+  archivedView,
+  flashWonId,
+  newId,
+}: {
+  leads: DashboardLead[];
+  sortKey: SortKey;
+  sortDir: SortDir;
+  onSort: (key: SortKey) => void;
+  onToggle: (id: string) => void;
+  expandedId: string | null;
+  onStatusChange: (id: string, status: LeadStatus) => void;
+  onArchive: (id: string) => void;
+  archivedView: boolean;
+  flashWonId: string | null;
+  newId: string | null;
+}) {
+  const [swipingId, setSwipingId] = useState<string | null>(null);
+
+  const handleArchive = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (swipingId) return;
+    setSwipingId(id); // foreground swipes aside, yellow shows behind
+    window.setTimeout(() => {
+      onArchive(id); // row leaves → AnimatePresence collapses the height
+      window.setTimeout(() => setSwipingId(null), 320);
+    }, SWIPE_MS);
+  };
+
+  return (
+    <div className="surface overflow-hidden rounded-2xl shadow-[0_12px_40px_-24px_rgba(10,11,13,0.35)]">
+      <div className="overflow-x-auto">
+        <div className="min-w-[960px]">
+          {/* Header */}
+          <div
+            className="grid items-center gap-x-4 border-b border-line px-6 py-3.5 text-sm"
+            style={gridStyle}
+          >
+            {HEADER_COLS.map((col) => {
+              const active = sortKey === col.key;
+              return (
+                <button
+                  key={col.key}
+                  type="button"
+                  onClick={() => onSort(col.key)}
+                  className={[
+                    "inline-flex items-center gap-1.5 text-left font-medium transition-colors hover:text-ink",
+                    active ? "text-ink" : "text-muted",
+                  ].join(" ")}
+                >
+                  {col.label}
+                  {active && <SortCaret dir={sortDir} />}
+                </button>
+              );
+            })}
+            <div aria-hidden />
+          </div>
+
+          {/* Rows */}
+          <AnimatePresence initial={false}>
+            {leads.map((lead) => {
+              const expanded = lead.id === expandedId;
+              const swiping = lead.id === swipingId;
+              const flashing = lead.id === flashWonId;
+              const isNew = lead.id === newId;
+              return (
+                <motion.div
+                  key={lead.id}
+                  initial={isNew ? { opacity: 0 } : false}
+                  animate={{ opacity: 1 }}
+                  exit={{ height: 0, opacity: 0, overflow: "hidden", transition: rowExit }}
+                  className="overflow-hidden border-b border-line/60 last:border-0"
+                >
+                  {/* clip keeps the swipe in-bounds */}
+                  <div className="relative overflow-hidden">
+                    {/* Yellow archive backing */}
+                    <div
+                      className="absolute inset-0 flex items-center justify-end gap-2 px-6 text-sm font-semibold text-amber-900"
+                      style={{ backgroundColor: "#f5c542" }}
+                      aria-hidden
+                    >
+                      {archivedView ? <RestoreIcon /> : <ArchiveIcon />}
+                      {archivedView ? "Restored" : "Archived"}
+                    </div>
+
+                    {/* Foreground tile */}
+                    <div className="row-fg" data-swiping={swiping}>
+                      {flashing && (
+                        <div className="win-flash pointer-events-none absolute inset-0 z-10" />
+                      )}
+                      {isNew && (
+                        <span className="pointer-events-none absolute left-2 top-2 z-10 h-1.5 w-1.5 rounded-full bg-brand-500 pulse-dot" />
+                      )}
+
+                      {/* Main row */}
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => onToggle(lead.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            onToggle(lead.id);
+                          }
+                        }}
+                        className={[
+                          "grid cursor-pointer items-center gap-x-4 px-6 py-4 text-sm transition-colors duration-150",
+                          expanded ? "bg-brand-50" : "hover:bg-black/[0.02]",
+                        ].join(" ")}
+                        style={gridStyle}
+                      >
+                        {/* Contact */}
+                        <div className="min-w-0">
+                          <div className="truncate font-semibold text-ink">
+                            {lead.contactName}
+                          </div>
+                          <div className="truncate text-xs text-muted">
+                            {lead.contactPhone}
+                          </div>
+                        </div>
+
+                        {/* Job type */}
+                        <div className="truncate text-ink-soft">
+                          {jobTypeLabel(lead.jobType)}
+                        </div>
+
+                        {/* Estimate */}
+                        <div className="truncate font-medium tabular-nums text-ink">
+                          <MoneyRange
+                            min={lead.quoteMinExVat}
+                            max={lead.quoteMaxExVat}
+                            animate={false}
+                          />
+                        </div>
+
+                        {/* Status */}
+                        <div className="min-w-0">
+                          <StatusPicker
+                            status={lead.status}
+                            onChange={(s) => onStatusChange(lead.id, s)}
+                          />
+                        </div>
+
+                        {/* Distance */}
+                        <div className="tabular-nums text-ink-soft">
+                          {formatDistance(lead.distanceMiles)}
+                        </div>
+
+                        {/* Received */}
+                        <div className="text-muted" suppressHydrationWarning>
+                          {formatRelativeTime(lead.receivedAt)}
+                        </div>
+
+                        {/* Archive / restore */}
+                        <div className="flex justify-center">
+                          <button
+                            type="button"
+                            onClick={(e) => handleArchive(e, lead.id)}
+                            aria-label={
+                              archivedView
+                                ? `Restore quote for ${lead.contactName}`
+                                : `Archive quote for ${lead.contactName}`
+                            }
+                            title={archivedView ? "Restore" : "Archive"}
+                            className="archive-btn"
+                          >
+                            {archivedView ? <RestoreIcon /> : <ArchiveIcon />}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Inline expanding detail */}
+                      <AnimatePresence initial={false}>
+                        {expanded && (
+                          <motion.div
+                            key="detail"
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={EXPAND_TRANSITION}
+                            style={{ overflow: "hidden" }}
+                            className="bg-black/[0.015]"
+                          >
+                            <QuoteDetailPanel lead={lead} />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+        </div>
+      </div>
+
+      {leads.length === 0 && (
+        <div className="flex flex-col items-center px-4 py-16 text-center">
+          <div className="mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-brand-50 text-2xl">
+            🏠
+          </div>
+          <p className="text-sm font-semibold text-ink">
+            {archivedView ? "Nothing archived" : "No quotes match"}
+          </p>
+          <p className="mt-1 max-w-xs text-sm text-muted">
+            {archivedView
+              ? "Quotes you archive will appear here."
+              : "New enquiries from your website appear here instantly."}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}

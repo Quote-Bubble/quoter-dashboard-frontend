@@ -1,7 +1,422 @@
 @import "tailwindcss";
 
+/* Latin-only Inter variable face (matches quoter-landing) */
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("@fontsource-variable/inter/files/inter-latin-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@import "@fontsource/poppins/latin-300.css";
+@import "@fontsource/poppins/latin-400.css";
+@import "@fontsource/poppins/latin-600.css";
+
+/* ---------------------------------------------------------------
+   Quoter design tokens — shared with quoter-landing.
+---------------------------------------------------------------- */
+@theme {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: "Poppins", "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+
+  /* Neutrals */
+  --color-canvas: #ffffff;
+  --color-ink: #0a0b0d;
+  --color-ink-soft: #3d4148;
+  --color-muted: #6b7280;
+  --color-line: #e9eaee;
+
+  /* Brand blue */
+  --color-brand-50: #eef4ff;
+  --color-brand-100: #dae6ff;
+  --color-brand-300: #7aa8ff;
+  --color-brand-400: #4f8bff;
+  --color-brand-500: #2f6bff;
+  --color-brand-600: #1f57f0;
+  --color-brand-700: #1546c9;
+
+  /* Status accents */
+  --color-status-new: #2f6bff;
+  --color-status-contacted: #b8791a;
+  --color-status-won: #128a4d;
+  --color-status-lost: #9aa0aa;
+
+  --shadow-soft: 0 1px 2px rgba(10, 11, 13, 0.04), 0 8px 24px rgba(10, 11, 13, 0.06);
+  --shadow-float: 0 24px 60px -20px rgba(23, 60, 160, 0.28), 0 8px 24px rgba(10, 11, 13, 0.08);
+}
+
+:root {
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-fast: 160ms;
+  --motion-base: 240ms;
+  --motion-shell: 380ms;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* Blended brand scrollbar (ported from the landing page) */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(47, 107, 255, 0.35) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(47, 107, 255, 0.35);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(47, 107, 255, 0.55);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
 body {
   margin: 0;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ---------------------------------------------------------------
+   Utility helpers (ported from quoter-landing)
+---------------------------------------------------------------- */
+.font-display {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+/* Primary blue gradient pill button */
+.btn-primary {
+  background: linear-gradient(180deg, var(--color-brand-500) 0%, var(--color-brand-600) 100%);
+  color: #fff;
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.28) inset,
+    0 8px 20px -6px rgba(31, 87, 240, 0.5);
+  transition:
+    transform 0.35s var(--ease-out-expo),
+    box-shadow 0.35s var(--ease-out-expo),
+    filter 0.25s ease;
+}
+.btn-primary:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.04);
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.32) inset,
+    0 14px 30px -6px rgba(31, 87, 240, 0.58);
+}
+.btn-primary:active {
+  transform: translateY(0);
+}
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Secondary white pill button */
+.btn-ghost {
   background: #fff;
-  color: #171717;
+  color: var(--color-ink);
+  border: 1px solid var(--color-line);
+  box-shadow: var(--shadow-soft);
+  transition:
+    transform 0.35s var(--ease-out-expo),
+    box-shadow 0.35s var(--ease-out-expo),
+    border-color 0.25s ease;
+}
+.btn-ghost:hover {
+  transform: translateY(-2px);
+  border-color: #d7d9e0;
+  box-shadow: 0 2px 4px rgba(10, 11, 13, 0.05), 0 14px 32px rgba(10, 11, 13, 0.1);
+}
+
+/* Glass surface — translucent card like the landing widget */
+.glass {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.7) inset,
+    var(--shadow-soft);
+}
+
+/* Solid card surface for dense content (tables, forms) */
+.surface {
+  background: #fff;
+  border: 1px solid var(--color-line);
+  box-shadow: var(--shadow-soft);
+}
+
+/* Subtle dot-grid backdrop for the app canvas */
+.dot-grid {
+  background-image: radial-gradient(rgba(12, 20, 55, 0.035) 1px, transparent 1.4px);
+  background-size: 22px 22px;
+}
+
+/* Frosted control toolbar (filters + search) — solid tint (no blur) for speed */
+.toolbar {
+  background: rgba(250, 250, 251, 0.92);
+  border: 1px solid var(--color-line);
+  box-shadow: var(--shadow-soft);
+}
+
+/* Shimmer skeleton */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: #eceef1;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.65),
+    transparent
+  );
+  animation: skeleton-sweep 1.3s infinite;
+}
+@keyframes skeleton-sweep {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Search box gentle focus grow */
+.search-box {
+  transition:
+    transform 0.2s var(--ease-out-soft),
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.search-box:focus-within {
+  transform: scale(1.015);
+}
+
+/* Tactile badge */
+.badge-tactile {
+  transition: transform 0.15s var(--ease-out-soft);
+}
+.badge-tactile:hover {
+  transform: scale(1.06);
+}
+
+/* Pulsing "new" dot */
+.pulse-dot {
+  position: relative;
+}
+.pulse-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: inherit;
+  animation: pulse-ring 1.8s var(--ease-out-soft) infinite;
+}
+@keyframes pulse-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  70%,
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+/* Win flash overlay when a status flips to "won" */
+.win-flash {
+  animation: win-flash 0.6s var(--ease-out-soft) forwards;
+}
+@keyframes win-flash {
+  0% {
+    background-color: rgba(18, 145, 90, 0);
+  }
+  25% {
+    background-color: rgba(18, 145, 90, 0.16);
+  }
+  100% {
+    background-color: rgba(18, 145, 90, 0);
+  }
+}
+
+/* Uppercase micro-label */
+.section-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-brand-600);
+}
+
+/* ---------------------------------------------------------------
+   Quotes table — delete button + pure-CSS collapse animations
+---------------------------------------------------------------- */
+/* Faint red bin → brighter red on hover → white bin in a red circle when pressed. */
+.bin-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  color: var(--color-muted);
+  opacity: 0.5;
+  background: transparent;
+  transition:
+    opacity 0.18s var(--ease-out-soft),
+    color 0.18s ease,
+    background-color 0.2s var(--ease-out-soft),
+    transform 0.14s var(--ease-out-soft);
+}
+.bin-btn:hover {
+  opacity: 1;
+  color: #e01d1d;
+}
+.bin-btn:active {
+  opacity: 1;
+  color: #ffffff;
+  background: #e01d1d;
+  transform: scale(0.94);
+  box-shadow: 0 6px 16px -4px rgba(224, 29, 29, 0.5);
+}
+
+/* Yellow archive button: faint amber → brighter on hover → white-on-amber pressed. */
+.archive-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  color: #b8791a;
+  opacity: 0.4;
+  background: transparent;
+  transition:
+    opacity 0.18s var(--ease-out-soft),
+    color 0.18s ease,
+    background-color 0.2s var(--ease-out-soft),
+    transform 0.14s var(--ease-out-soft);
+}
+.archive-btn:hover {
+  opacity: 1;
+  color: #9a6510;
+}
+.archive-btn:active {
+  opacity: 1;
+  color: #ffffff;
+  background: #e0a11d;
+  transform: scale(0.94);
+  box-shadow: 0 6px 16px -4px rgba(224, 161, 29, 0.55);
+}
+
+/* Foreground tile that swipes aside on archive, revealing the yellow layer. */
+.row-fg {
+  position: relative;
+  background: var(--color-canvas);
+  transition:
+    transform var(--motion-base) var(--ease-out-soft),
+    opacity var(--motion-base) ease;
+}
+.row-fg[data-swiping="true"] {
+  transform: translateX(104%);
+  opacity: 0;
+}
+
+/* Expand/collapse without measuring: animate grid-template-rows 0fr → 1fr.
+   The single child MUST have overflow:hidden + min-height:0. */
+.collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--motion-shell) var(--ease-out-soft);
+}
+.collapse[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+.collapse > .collapse-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* Row wrapper that collapses itself away on delete. */
+.row-shell {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows var(--motion-base) var(--ease-out-soft),
+    opacity var(--motion-base) ease;
+}
+.row-shell[data-removing="true"] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+.row-shell > .row-clip {
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* Animated roof outline over the satellite mock (echoes the widget's reveal) */
+.sat-outline {
+  fill: rgba(47, 107, 255, 0.18);
+  stroke: #2f6bff;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 1px 3px rgba(47, 107, 255, 0.45));
+  stroke-dasharray: 320;
+  stroke-dashoffset: 320;
+  animation: sat-draw 0.7s var(--ease-out-expo) forwards 0.15s;
+}
+@keyframes sat-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sat-outline {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Focus ring shared by inputs */
+.field {
+  background: #fff;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.field:focus,
+.field:focus-within {
+  outline: none;
+  border-color: var(--color-brand-400);
+  box-shadow: 0 0 0 4px rgba(47, 107, 255, 0.14);
 }
