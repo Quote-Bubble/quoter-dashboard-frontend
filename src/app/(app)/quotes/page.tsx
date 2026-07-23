@@ -1,5 +1,5 @@
 import type { DashboardLead, JobType, LeadStatus } from "@/lib/types";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getUser } from "@/lib/supabase/server";
 import { getRoofer } from "@/lib/roofer";
 import QuotesClient from "@/components/QuotesClient";
 import PageHeader from "@/components/PageHeader";
@@ -18,6 +18,7 @@ type LeadRow = {
   quote_min_ex_vat: number | null;
   quote_max_ex_vat: number | null;
   received_at: string;
+  archived: boolean;
 };
 
 /** Map a persisted lead row to the dashboard view model. */
@@ -35,6 +36,7 @@ function mapRow(row: LeadRow): DashboardLead {
     quoteMinExVat: row.quote_min_ex_vat,
     quoteMaxExVat: row.quote_max_ex_vat,
     receivedAt: row.received_at,
+    archived: row.archived,
   };
 }
 
@@ -42,14 +44,11 @@ function mapRow(row: LeadRow): DashboardLead {
 export const dynamic = "force-dynamic";
 
 export default async function QuotesPage() {
+  const [user, roofer] = await Promise.all([getUser(), getRoofer()]);
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
   // No roofer membership means RLS will return zero leads no matter what — say
   // that plainly instead of rendering an empty table.
-  const roofer = await getRoofer();
   if (!roofer) {
     return (
       <>
@@ -62,7 +61,7 @@ export default async function QuotesPage() {
   const { data, error } = await supabase
     .from("leads")
     .select(
-      "id,status,lead_type,job_type,contact_name,contact_phone,contact_email,address_formatted,address_postcode,quote_min_ex_vat,quote_max_ex_vat,received_at",
+      "id,status,lead_type,job_type,contact_name,contact_phone,contact_email,address_formatted,address_postcode,quote_min_ex_vat,quote_max_ex_vat,received_at,archived",
     )
     .order("received_at", { ascending: false });
 

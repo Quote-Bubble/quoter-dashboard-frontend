@@ -30,8 +30,8 @@ export type DashboardLead = {
   quoteMinExVat: number | null;
   quoteMaxExVat: number | null;
   receivedAt: string; // ISO timestamp
-  /** Hidden from the main tabs; shown under "Archived". */
-  archived?: boolean;
+  /** Persisted on `leads.archived`. Hidden from the main tabs; shown under "Archived". */
+  archived: boolean;
 };
 
 // ---------------------------------------------------------------------------

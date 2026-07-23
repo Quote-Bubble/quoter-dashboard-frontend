@@ -1,8 +1,15 @@
+import { cache } from "react";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
-/** Server Supabase client bound to the request cookies (Next 16 async cookies). */
-export async function createClient() {
+/**
+ * Server Supabase client bound to the request cookies (Next 16 async cookies).
+ *
+ * Wrapped in React `cache()` so the layout and page rendered for a single
+ * request share one client/session instead of each re-reading cookies and
+ * re-hitting Supabase independently.
+ */
+export const createClient = cache(async function createClient() {
   const cookieStore = await cookies();
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -25,4 +32,17 @@ export async function createClient() {
       },
     },
   );
-}
+});
+
+/**
+ * The signed-in user for this request, deduped via `cache()` so the layout
+ * and every page under it can each ask "who is this?" without each triggering
+ * its own round trip to Supabase Auth.
+ */
+export const getUser = cache(async () => {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user;
+});

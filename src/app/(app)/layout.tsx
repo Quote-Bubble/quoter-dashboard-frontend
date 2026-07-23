@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-import { createClient } from "@/lib/supabase/server";
+import { getUser } from "@/lib/supabase/server";
 import { getRoofer } from "@/lib/roofer";
 import DashboardShell from "@/components/DashboardShell";
 
@@ -10,13 +10,8 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const [user, roofer] = await Promise.all([getUser(), getRoofer()]);
   if (!user) redirect("/login");
-
-  const roofer = await getRoofer();
 
   return (
     <DashboardShell userEmail={user.email ?? null} roofer={roofer}>

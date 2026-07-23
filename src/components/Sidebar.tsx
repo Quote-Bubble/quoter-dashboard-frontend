@@ -36,6 +36,15 @@ const NAV: NavItem[] = [
     ),
   },
   {
+    href: "/analytics",
+    label: "Analytics",
+    icon: (
+      <svg {...iconProps} aria-hidden>
+        <path d="M4 19V5M4 19h16M8 19v-6M13 19V9M18 19v-9" />
+      </svg>
+    ),
+  },
+  {
     href: "/account",
     label: "Account",
     icon: (

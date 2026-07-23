@@ -77,6 +77,88 @@ function RestoreIcon() {
   );
 }
 
+function ChevronLeftIcon() {
+  return (
+    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M15 6l-6 6 6 6" />
+    </svg>
+  );
+}
+
+function ChevronRightIcon() {
+  return (
+    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M9 6l6 6-6 6" />
+    </svg>
+  );
+}
+
+function PaginationBar({
+  page,
+  pageSize,
+  pageCount,
+  totalCount,
+  onPageChange,
+  onPageSizeChange,
+}: {
+  page: number;
+  pageSize: number;
+  pageCount: number;
+  totalCount: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
+}) {
+  const rangeStart = totalCount === 0 ? 0 : page * pageSize + 1;
+  const rangeEnd = Math.min(totalCount, (page + 1) * pageSize);
+
+  return (
+    <div className="flex flex-col gap-3 border-t border-line px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+      <label className="flex items-center gap-2 text-sm text-muted">
+        Rows per page
+        <select
+          value={pageSize}
+          onChange={(e) => onPageSizeChange(Number(e.target.value))}
+          className="field rounded-lg px-2 py-1 text-sm font-medium text-ink outline-none"
+        >
+          {PAGE_SIZE_OPTIONS.map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <div className="flex items-center gap-4">
+        <span className="text-sm text-muted">
+          {rangeStart}–{rangeEnd} of {totalCount}
+        </span>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => onPageChange(page - 1)}
+            disabled={page <= 0}
+            aria-label="Previous page"
+            className="grid h-8 w-8 place-items-center rounded-full text-ink-soft transition-colors hover:bg-black/[0.04] hover:text-ink disabled:pointer-events-none disabled:opacity-30"
+          >
+            <ChevronLeftIcon />
+          </button>
+          <button
+            type="button"
+            onClick={() => onPageChange(page + 1)}
+            disabled={page >= pageCount - 1}
+            aria-label="Next page"
+            className="grid h-8 w-8 place-items-center rounded-full text-ink-soft transition-colors hover:bg-black/[0.04] hover:text-ink disabled:pointer-events-none disabled:opacity-30"
+          >
+            <ChevronRightIcon />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
+
 export default function QuotesTable({
   leads,
   sortKey,
@@ -92,6 +174,12 @@ export default function QuotesTable({
   rooferSlug,
   flashWonId,
   newId,
+  page,
+  pageSize,
+  pageCount,
+  totalCount,
+  onPageChange,
+  onPageSizeChange,
 }: {
   leads: DashboardLead[];
   sortKey: SortKey;
@@ -108,6 +196,14 @@ export default function QuotesTable({
   rooferSlug: string;
   flashWonId: string | null;
   newId: string | null;
+  /** Zero-indexed current page over the already filtered + sorted list. */
+  page: number;
+  pageSize: number;
+  pageCount: number;
+  /** Count of leads matching the current filter (pre-pagination). */
+  totalCount: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
 }) {
   const [swipingId, setSwipingId] = useState<string | null>(null);
 
@@ -288,7 +384,18 @@ export default function QuotesTable({
         </div>
       </div>
 
-      {leads.length === 0 && (
+      {totalCount > 0 && (
+        <PaginationBar
+          page={page}
+          pageSize={pageSize}
+          pageCount={pageCount}
+          totalCount={totalCount}
+          onPageChange={onPageChange}
+          onPageSizeChange={onPageSizeChange}
+        />
+      )}
+
+      {totalCount === 0 && (
         <div className="flex flex-col items-center px-4 py-16 text-center">
           <div className="mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-brand-50 text-2xl">
             🏠

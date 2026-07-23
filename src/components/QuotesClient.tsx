@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import type {
   DashboardLead,
@@ -10,6 +11,7 @@ import type {
 } from "@/lib/types";
 import { jobTypeLabel, statusLabel, STATUS_ORDER } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
+import { revalidateAnalytics } from "@/lib/actions";
 import PageHeader from "@/components/PageHeader";
 import FilterBar, { type Filter } from "@/components/FilterBar";
 import QuotesTable, {
@@ -61,6 +63,17 @@ export default function QuotesClient({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [flashWonId, setFlashWonId] = useState<string | null>(null);
   const flashTimer = useRef<number | null>(null);
+  const [pageSize, setPageSize] = useState(25);
+  const [page, setPage] = useState(0);
+  const router = useRouter();
+
+  // Quotes writes go straight to Supabase for instant optimistic UI, which
+  // bypasses Next's cache — so Analytics silently kept stale numbers until a
+  // manual refresh. Invalidate its cached copy, then eagerly re-fetch it in
+  // the background so it's already warm by the time you actually click over.
+  const syncAnalytics = () => {
+    void revalidateAnalytics().then(() => router.prefetch("/analytics"));
+  };
 
   // `payload` is a fat jsonb column (roof segments, per-segment contributions),
   // so it's fetched per lead on expand rather than in the list query.
@@ -105,6 +118,24 @@ export default function QuotesClient({
     return sorted;
   }, [leads, statusFilter, search, sortKey, sortDir]);
 
+  // Changing what's being viewed invalidates whatever page you were on.
+  useEffect(() => {
+    setPage(0);
+  }, [statusFilter, search, sortKey, sortDir, pageSize]);
+
+  const pageCount = Math.max(1, Math.ceil(visible.length / pageSize));
+  // Clamp so archiving/deleting rows off the last page doesn't strand you on
+  // a now-empty one.
+  const safePage = Math.min(page, pageCount - 1);
+  useEffect(() => {
+    if (safePage !== page) setPage(safePage);
+  }, [safePage, page]);
+
+  const pageLeads = useMemo(
+    () => visible.slice(safePage * pageSize, safePage * pageSize + pageSize),
+    [visible, safePage, pageSize],
+  );
+
   const handleSort = (key: SortKey) => {
     if (key === sortKey) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -133,16 +164,37 @@ export default function QuotesClient({
           setLeads((prev) =>
             prev.map((l) => (l.id === id ? { ...l, status: prevStatus } : l)),
           );
+        } else {
+          syncAnalytics();
         }
       });
   };
 
-  // Archive is session-only: the leads table has no archived column yet.
   const handleArchive = (id: string) => {
+    const prevArchived = leads.find((l) => l.id === id)?.archived ?? false;
+    const nextArchived = !prevArchived;
     setLeads((prev) =>
-      prev.map((l) => (l.id === id ? { ...l, archived: !l.archived } : l)),
+      prev.map((l) => (l.id === id ? { ...l, archived: nextArchived } : l)),
     );
     setExpandedId((cur) => (cur === id ? null : cur));
+
+    // Persist (RLS allows authenticated members to update their own leads).
+    void createClient()
+      .from("leads")
+      .update({ archived: nextArchived })
+      .eq("id", id)
+      .then(({ error }) => {
+        if (error) {
+          // Roll back on failure.
+          setLeads((prev) =>
+            prev.map((l) =>
+              l.id === id ? { ...l, archived: prevArchived } : l,
+            ),
+          );
+        } else {
+          syncAnalytics();
+        }
+      });
   };
 
   const loadPayload = (id: string) => {
@@ -228,8 +280,8 @@ export default function QuotesClient({
       </div>
 
       <QuotesTable
-        key={statusFilter}
-        leads={visible}
+        key={`${statusFilter}-${safePage}-${pageSize}`}
+        leads={pageLeads}
         sortKey={sortKey}
         sortDir={sortDir}
         onSort={handleSort}
@@ -243,6 +295,12 @@ export default function QuotesClient({
         rooferSlug={rooferSlug}
         flashWonId={flashWonId}
         newId={null}
+        page={safePage}
+        pageSize={pageSize}
+        pageCount={pageCount}
+        totalCount={visible.length}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
       />
     </>
   );

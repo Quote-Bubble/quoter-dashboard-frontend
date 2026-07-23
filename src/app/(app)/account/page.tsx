@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getUser } from "@/lib/supabase/server";
 import { getRoofer } from "@/lib/roofer";
 import { getPricing } from "@/lib/pricing";
 import PageHeader from "@/components/PageHeader";
@@ -19,11 +19,7 @@ function InfoTile({ label, value }: { label: string; value: string }) {
 export const dynamic = "force-dynamic";
 
 export default async function AccountPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const roofer = await getRoofer();
+  const [user, roofer] = await Promise.all([getUser(), getRoofer()]);
 
   if (!roofer) {
     return (
